@@ -1,24 +1,24 @@
 {
-    "id": "1676B9BA",
-    "path": "~/git/em/em.R",
+    "id": "5305457B",
+    "path": "~/git/election_2019_nd/election_2019.R",
     "project_path": null,
     "type": "r_source",
-    "hash": "3086749137",
+    "hash": "0",
     "contents": "",
     "dirty": false,
-    "created": 1621901997863.0,
+    "created": 1621989772364.0,
     "source_on_save": false,
-    "relative_order": 4,
+    "relative_order": 3,
     "properties": {
-        "cursorPosition": "231,110",
-        "scrollLine": "0"
+        "cursorPosition": "1416,0",
+        "scrollLine": "1411"
     },
     "folds": "",
-    "lastKnownWriteTime": 1594019566,
+    "lastKnownWriteTime": 1618005272,
     "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1594019566,
+    "last_content_update": 1618005272,
     "read_only": false,
     "read_only_alternatives": []
 }

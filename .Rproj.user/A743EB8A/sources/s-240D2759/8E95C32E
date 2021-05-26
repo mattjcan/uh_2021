@@ -1,16 +1,16 @@
 {
-    "id": "5FE3E00E",
-    "path": "C:/Users/matt/Dropbox/2a. Election/UH_2021/uh_slides.Rmd",
+    "id": "8E95C32E",
+    "path": "~/git/UH_2021/uh_slides.Rmd",
     "project_path": "uh_slides.Rmd",
     "type": "r_markdown",
-    "hash": "4118557461",
+    "hash": "0",
     "contents": "",
     "dirty": false,
-    "created": 1621988308904.0,
+    "created": 1621989764349.0,
     "source_on_save": false,
-    "relative_order": 6,
+    "relative_order": 2,
     "properties": {
-        "cursorPosition": "85,0",
+        "cursorPosition": "4,7",
         "scrollLine": "0",
         "source_window_id": "",
         "last_setup_crc32": ""
@@ -20,7 +20,7 @@
     "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1621988724132,
+    "last_content_update": 1621988724,
     "read_only": false,
     "read_only_alternatives": []
 }
