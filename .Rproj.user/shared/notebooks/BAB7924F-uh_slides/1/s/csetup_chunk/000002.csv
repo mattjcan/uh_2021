@@ -1,0 +1,90 @@
+"0",""
+"0","knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE, dpi = 300, fig.height = 5)"
+"0",""
+"0","library(knitr)"
+"0",""
+"0","source(""uh.R"")"
+"2","Parsed with column specification:
+cols(
+  `Venue and Vote Types` = [31mcol_character()[39m,
+  `O'Connell` = [32mcol_double()[39m,
+  Archie = [32mcol_double()[39m,
+  `Lib Dems` = [32mcol_double()[39m,
+  `One Nation` = [32mcol_number()[39m,
+  Nats = [32mcol_number()[39m,
+  Norman = [32mcol_double()[39m,
+  Reynolds = [32mcol_double()[39m,
+  Greens = [32mcol_double()[39m,
+  Labor = [32mcol_number()[39m,
+  SAP = [32mcol_double()[39m,
+  AJP = [32mcol_double()[39m,
+  SFF = [32mcol_number()[39m,
+  Fraser = [32mcol_double()[39m,
+  Informal = [32mcol_double()[39m,
+  lab = [31mcol_character()[39m
+)
+"
+"2","Parsed with column specification:
+cols(
+  `Venue and Vote Types` = [31mcol_character()[39m,
+  SAP = [32mcol_double()[39m,
+  SFF = [32mcol_number()[39m,
+  Nats = [32mcol_number()[39m,
+  AJP = [32mcol_double()[39m,
+  Greens = [32mcol_double()[39m,
+  Christian = [32mcol_double()[39m,
+  `Lib Dems` = [32mcol_double()[39m,
+  Labor = [32mcol_number()[39m,
+  Informal = [32mcol_double()[39m,
+  lab = [31mcol_character()[39m
+)
+"
+"1","OGR data source with driver:"
+"1"," "
+"1","ESRI Shapefile"
+"1"," "
+"1","
+"
+"1","Source: """
+"1",""
+"1","C:\Users\matt\Dropbox\2a. Election\UH_2021\data\NSW_electoral_boundaries_25-02-2016.shx"
+"1",""
+"1",""", layer: """
+"1",""
+"1","NSW_electoral_boundaries_25-02-2016"
+"1",""
+"1",""""
+"1",""
+"1","
+"
+"1","with"
+"1"," "
+"1","47"
+"1"," "
+"1","features"
+"1","
+"
+"1","It has"
+"1"," "
+"1","9"
+"1"," "
+"1","fields"
+"1","
+"
+"1","Integer64 fields read as strings: "
+"1"," "
+"1","E_div_numb Numccds Actual Projected Total_Popu Australian"
+"1"," "
+"1","
+"
+"2","Z-dimension discarded"
+"2","Parsed with column specification:
+cols(
+  lab = [31mcol_character()[39m,
+  lab_gg = [31mcol_character()[39m,
+  lon = [32mcol_double()[39m,
+  lat = [32mcol_double()[39m
+)
+"
+"2","
+"

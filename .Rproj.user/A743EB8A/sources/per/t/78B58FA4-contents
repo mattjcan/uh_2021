@@ -1,0 +1,740 @@
+# PREAMBLE ---------------------------------------------------------------
+
+library(tidyverse)
+library(knitr)
+library(xaringan)
+library(rmarkdown)
+library(ggthemes)
+library(zoo)
+library(readxl)
+library(lubridate)
+library(scales)
+library(easynls)
+library(gridExtra)
+library(readxl)
+library(survey)
+library(vcd)
+library(XML)
+library(xml2)
+library(sp)
+library(rgdal)
+library(leaflet)
+library(mapview)
+library(widgetframe)
+library(rvest)
+
+
+# PLOT FORMATS ----
+
+background <- c("#e5e5df")
+
+theme_mc <- theme_economist() + 
+  theme(legend.position="none") + 
+  theme(plot.title = element_text(size = 10, face = "bold")) +
+  theme(axis.text = element_text(size = 10, vjust = 0.3, hjust = 0.5)) +
+  theme(axis.title.y = element_text(size = 10)) +
+  theme(axis.line = element_blank()) +
+  theme(axis.ticks.y = element_blank()) +
+  theme(plot.caption = element_text(hjust = 0, size = 9)) +
+  theme(plot.background = element_rect(fill = background)) +  
+  theme(panel.background = element_rect(fill = background)) +   
+  theme(panel.grid.major.y =  element_line(color = "#b3b3b3", size = 0.2))
+
+stroke_size <- 0.75
+
+line_color <- "#2166ac"
+
+# IMPORT ------------------------------------------------------------------
+
+d <- "C:/Users/matt/Documents/git/qld_20/" # parent directory for the data
+
+p17 <- read_csv(paste0(d, "data/p17.csv"))
+
+tpp17_im <- read_csv(paste0(d, "data/tpp17.csv"))
+
+pb20 <- read_csv(paste0(d, "data/pb20.csv"))
+
+booth_tab <- read_csv(paste0(d, "data/booth_tab.csv"))
+
+state_div <- read_csv(paste0(d,"data/state_div.csv"), skip = 0)
+
+reg_list <- read_csv(paste0(d,"data/reg_list.csv"), skip = 0)
+
+fed_elec <- readOGR(paste0(d, "data/E_AUGEC_region.shx"))
+
+qld_xml <- read_xml(paste0(d, "data/publicResults.xml"))
+
+qld_xml_old <- read_xml(paste0(d, "data/201103 publicResults.xml"))
+
+xf <- xmlTreeParse(paste0(d, "data/publicResults.xml"), useInternalNodes = TRUE)
+
+xt <- xmlRoot(xf)
+
+# Primary by division
+
+cand_list <- qld_xml %>% 
+  xml_find_all("//districts/district/candidates/candidate") %>% 
+  map_dfr(~flatten(c(xml_attrs(.x), 
+                     map(xml_children(.x), 
+                         ~set_names(as.list(xml_text(.x)), xml_name(.x)))))) %>%
+  type_convert()
+
+p20_cand <- qld_xml %>% 
+  xml_find_all("//countRound/primaryVoteResults/candidate") %>% 
+  map_dfr(~flatten(c(xml_attrs(.x), 
+                     map(xml_children(.x), 
+                         ~set_names(as.list(xml_text(.x)), xml_name(.x)))))) %>%
+  type_convert()
+
+p20_cand <- p20_cand %>% 
+  select(-ballotOrderNumber, -percentage) %>% 
+  group_by(ballotName) %>% 
+  top_n(count, n=1) %>% 
+  distinct()
+
+p20 <- left_join(cand_list, p20_cand, by = "ballotName")
+
+p20 <- p20 %>% 
+  select(ballotName, party, partyCode, count)
+
+cand_no <- xml_attr(xml_find_all(qld_xml, "//districts/district/candidates"), attr = "count")
+
+div_list <- xml_attr(xml_find_all(qld_xml, "//districts/district"), attr = "districtName")
+
+div_list <- rep(div_list, cand_no)
+
+p20 <- bind_cols(p20, div = div_list)
+
+p20 <- p20 %>% 
+  rename(v = count,
+         name = ballotName) %>% 
+  select(div, party, v, name)
+
+# TPP by division 2020
+
+tpp20_x <- qld_xml_old %>% 
+  xml_find_all("//countRound/twoCandidateVotes/candidate") %>% 
+  map_dfr(~flatten(c(xml_attrs(.x), 
+                     map(xml_children(.x), 
+                         ~set_names(as.list(xml_text(.x)), xml_name(.x)))))) %>%
+  type_convert()
+
+# TPP by division 2017
+
+tpp17_1 <- tpp17_im[,1:5]
+
+tpp17_2 <- tpp17_im[,c(1, 6:9)]
+
+names(tpp17_1) <- c("div", "name", "party", "v", "p")
+
+names(tpp17_2) <- c("div", "name", "party", "v", "p")
+
+tpp17 <- bind_rows(tpp17_1, tpp17_2)
+
+# TIDY ----- 
+
+# primary  by division
+
+p20 <- p20 %>% 
+  filter(div != "Aurukun Shire Division 1")
+
+p20$party <- recode(p20$party, "Liberal National Party of Queensland" = "LNP", "Pauline Hanson's One Nation Queensland Division" = "ON", "Queensland Greens" = "GRN", "Australian Labor Party (State of Queensland)" = "ALP", "Civil Liberties & Motorists Party" = "CL",  "Clive Palmer's United Australia Party" = "UAP", "Independent" = "IND", "Informed Medical Options Party (IMOP)" = "IMOP", "Legalise Cannabis Qld (Party)" = "LC", "Animal Justice Party (Queensland)" = "AJP", "Katter's Australian Party (KAP)" = "KAP", "North Queensland First" = "NQF", "Shooters, Fishers and Farmers Party (QLD)" = "SFF")
+
+p20$party_lab <- recode(p20$party, "ON" = "One Nation", "GRN" = "Greens", "ALP" = "Labor", "SFF" = "Shooters")
+
+p20$v <- as.numeric(p20$v)
+
+p20 <- p20 %>% 
+  group_by(div) %>% 
+  mutate(p = v / sum(v, na.rm = T) * 100)
+
+p20 <- p20 %>% 
+  select(div, party, v, p, party_lab, name)
+
+p20$year = "2020"
+
+names_tab <- p20 %>% 
+  select(name, div, party)
+
+# primary by division 2017 
+
+p17 <- gather(p17, key = "party", value = "v", -div)
+
+p17 <- p17 %>% 
+  arrange(div) %>% 
+  filter(!is.na(v))
+
+p17 <- p17 %>% 
+  group_by(div) %>%
+  mutate(p = v / sum(v, na.rm = T) * 100)
+
+p17$party_lab <- recode(p17$party, "ON" = "One Nation", "GRN" = "Greens", "ALP" = "Labor")
+
+p17$year <- "2017"
+
+p20_c <- p20 %>% 
+  select(-name)
+
+p <- bind_rows(p20_c, p17)
+
+p <- p %>% 
+  group_by(div, party) %>% 
+  arrange(div, year) %>% 
+  mutate(s = p - lag(p, 1))
+
+p_lnp <- p %>% 
+  filter(party == "LNP" & year == "2020") %>% 
+  arrange(-s)
+
+p_lnp <- left_join(p_lnp, state_div, by = "div")
+
+p$sum_lab <- recode(p$party_lab, "AJP" = "Other", "CCN"  = "Other", "CL" = "Other", "IMOP"  = "Other", "IND"  = "Other", "LC" = "Other", "NQF" = "Other", "Shooters" = "Other", "UAP" = "Other", "One Nation" = "One\nNation")
+
+p_oth <- p %>% 
+  ungroup() %>% 
+  group_by(div, sum_lab, year) %>% 
+  summarise(v = sum(v, na.rm = T)) %>% 
+  group_by(div, year) %>% 
+  mutate(p = v / sum(v, na.rm =  T)* 100) %>% 
+  ungroup() 
+
+p_oth <- p_oth %>%
+  group_by(div, sum_lab) %>% 
+  arrange(div,year) %>% 
+  mutate(s = p - lag(p, 1)) %>% 
+  arrange(div, sum_lab)
+
+p_oth[p_oth$year == "2017", ]$s <- NA
+
+p_oth <- p_oth %>% 
+  rename(party_lab = sum_lab)
+
+p <- left_join(p, reg_list, by = "div")
+
+# primary by polling booth
+
+pb20 <- left_join(pb20, booth_tab, by = "pb_id")
+
+pb20 <- pb20 %>% 
+  filter(pb != "YES") %>% 
+  rename(lat = latitude,
+         lon = longitude)
+
+pb20_fed <- pb20 %>% 
+  filter(!is.na(lat))
+
+pb20_sp <- pb20_fed
+
+coordinates(pb20_sp) <- ~lon + lat
+
+proj4string(pb20_sp) <- proj4string(fed_elec)
+
+in_fed <- over(pb20_sp, fed_elec)
+
+pb20_fed$fed_div <- in_fed$Elect_div
+
+
+# CALCS ---- 
+
+# primary across state
+
+p_state <- p %>% 
+  ungroup() %>% 
+  group_by(party, party_lab, year) %>% 
+  summarise(v = sum(v, na.rm = T)) %>% 
+  group_by(year) %>% 
+  mutate(p = v / sum(v, na.rm =  T)* 100) %>% 
+  ungroup() %>% 
+  mutate(year = as.numeric(year)) %>% 
+  arrange(party, year) %>% 
+  mutate(s = p - lag(p, 1))
+
+p_state[p_state$year == "2017", ]$s <- NA
+
+p_state[p_state$party %in% c("CCN", "CL", "IMOP", "LC", "NQF", "SFF", "UAP"), ]$s <- NA
+
+p_state$sum_lab <- recode(p_state$party_lab, "AJP" = "Other", "CCN"  = "Other", "CL" = "Other", "IMOP"  = "Other", "IND"  = "Other", "LC" = "Other", "NQF" = "Other", "Shooters" = "Other", "UAP" = "Other", "One Nation" = "One\nNation")
+
+p_state_oth <- p_state %>% 
+  ungroup() %>% 
+  group_by(sum_lab, year) %>% 
+  summarise(v = sum(v, na.rm = T)) %>% 
+  group_by(year) %>% 
+  mutate(p = v / sum(v, na.rm =  T)* 100) %>% 
+  ungroup() %>% 
+  mutate(year = as.numeric(year)) %>% 
+  arrange(sum_lab, year) %>% 
+  mutate(s = p - lag(p, 1))
+
+p_state_oth[p_state_oth$year == "2017", ]$s <- NA
+
+p_state_oth <- p_state_oth %>% 
+  rename(party_lab = sum_lab)
+
+p_reg <- p %>% 
+  group_by(party, party_lab, year, reg) %>% 
+  summarise(v = sum(v, na.rm = T)) %>% 
+  group_by(year, reg) %>% 
+  mutate(p = v / sum(v, na.rm =  T)* 100) %>% 
+  ungroup() %>% 
+  mutate(year = as.numeric(year)) %>% 
+  arrange(party_lab, reg) %>% 
+  mutate(s = p - lag(p, 1)) 
+
+p_reg[p_reg$year == "2017",]$s = NA
+
+p_reg$reg_lab <- recode(p_reg$reg, cap = "Capricornia", cq = "CQ", fnq = "FNQ", gc = "Gold\nCoast", mn = "Metro\nNorth", ms = "Metro\nSouth", mw = "Metro\nWest", nq = "North", wm= "West\nMoreton", sw = "South\nWest", sc = "Sun.\nCoast", wb = "Wide\nBay")
+
+
+# primary by polling booth
+
+pb20_f <- pb20_fed %>% 
+  filter(!is.na(fed_div)) %>% 
+  group_by(fed_div, party) %>% 
+  summarise(v = sum(v, na.rm = T)) %>% 
+  group_by(fed_div) %>% 
+  mutate(p = v / sum(v, na.rm = T) * 100) 
+  
+
+oth_list <- c("AJP", "CL", "IMOP", "IND", "LC", "UAP", "SFF", "NQF")
+
+pb20_f$party_sum  <- ifelse(pb20_f$party  %in% oth_list, "OTH", pb20_f$party)
+
+pb20_f <- pb20_f %>% 
+  group_by(fed_div, party_sum) %>% 
+  summarise(v = sum(v, na.rm = T)) %>% 
+  group_by(fed_div) %>% 
+  mutate(p = v / sum(v, na.rm = T) * 100) %>% 
+  rename(party = party_sum)
+
+pb20_f$party_lab <- pb20_f$party
+
+pb20_f$party_lab <- recode(pb20_f$party, "ALP" = "Labor", "ON" = "One\nNation", "GRN" = "Greens", "OTH" = "Other")
+
+# TPP by division 2020
+
+tpp20_x <- tpp20_x %>% 
+  rename(name = ballotName,
+         v = count)
+
+tpp20 <- left_join(tpp20_x, names_tab, by = "name")
+
+tpp20 <- tpp20 %>% 
+  group_by(div) %>% 
+  mutate(p = v / sum(v, na.rm = T) * 100)
+
+tpp20 <- tpp20 %>% 
+  select(div, party, v, p, name)
+
+tpp20$party_lab <- recode(tpp20$party, "ON" = "One Nation", "GRN" = "Greens", "ALP" = "Labor", "SFF" = "Shooters")
+
+tpp20$year <- "2020"
+  
+# TPP by division 2017
+  
+tpp17$party_lab <- recode(tpp17$party, "ON" = "One Nation", "GRN" = "Greens", "ALP" = "Labor", "SFF" = "Shooters")
+
+tpp17$year <- "2017"
+
+tpp17 <- tpp17 %>% 
+  select(div, party, v, p, name, party_lab, year)
+
+tpp <- bind_rows(tpp20, tpp17)
+
+tpp <- tpp %>% 
+  group_by(div, party) %>% 
+  arrange(div, year) %>% 
+  mutate(s = p - lag(p, 1))
+
+tpp_lnp <- tpp %>% 
+  filter(party == "LNP" & year == "2020") %>% 
+  arrange(-s)
+
+tpp_lnp <- left_join(tpp_lnp, state_div, by = "div")
+
+tpp <- left_join(tpp, reg_list, by = "div")
+
+tpp_s1 <- tpp %>% 
+  filter(year == "2020") %>% 
+  select(div, party)
+
+tpp_s1$party2 <- lag(tpp_s1$party, 1)
+
+tpp_s1 <- tpp_s1[-seq(1, length(tpp_s1$div), 2), ]
+
+div_list_1 <- tpp_s1 %>% 
+  mutate(t1 = ifelse(party == "LNP" | party == "ALP", 1, 0),
+         t2 = ifelse(party2 == "LNP" | party2 == "ALP", 1, 0),
+         t3 = ifelse(t1 == 1 & t2 == 1, 1, 0)) %>% 
+  filter(t3 == 1) %>% 
+  ungroup() %>% 
+  select(div)
+
+div_list_1 <- pull(div_list_1)
+
+tpp_filt_20 <- tpp %>% 
+  filter(year == "2020") %>% 
+  filter(div %in% div_list_1)
+
+tpp_s2 <- tpp %>% 
+  filter(year == "2017") %>% 
+  select(div, party)
+
+tpp_s2$party2 <- lag(tpp_s2$party, 1)
+
+tpp_s2 <- tpp_s2[-seq(1, length(tpp_s2$div), 2), ]
+
+div_list_2 <- tpp_s2 %>% 
+  mutate(t1 = ifelse(party == "LNP" | party == "ALP", 1, 0),
+         t2 = ifelse(party2 == "LNP" | party2 == "ALP", 1, 0),
+         t3 = ifelse(t1 == 1 & t2 == 1, 1, 0)) %>% 
+  filter(t3 == 1) %>% 
+  ungroup() %>% 
+  select(div)
+
+div_list_2 <- pull(div_list_2)
+
+tpp_filt_17 <- tpp %>% 
+  filter(year == "2017") %>% 
+  filter(div %in% div_list_2)
+
+tpp_reg_c <- bind_rows(tpp_filt_17, tpp_filt_20)
+
+tpp_reg <- tpp_reg_c %>% 
+  group_by(party, party_lab, year, reg) %>% 
+  summarise(v = sum(v, na.rm = T)) %>% 
+  group_by(year, reg) %>% 
+  mutate(p = v / sum(v, na.rm =  T)* 100) %>% 
+  ungroup() %>% 
+  mutate(year = as.numeric(year)) %>% 
+  ungroup()
+
+tpp_reg$reg_lab <- recode(tpp_reg$reg, cap = "Capricornia", cq = "CQ", fnq = "FNQ", gc = "Gold\nCoast", mn = "Metro\nNorth", ms = "Metro\nSouth", mw = "Metro\nWest", nq = "North", wm= "West\nMoreton", sw = "South\nWest", sc = "Sun.\nCoast", wb = "Wide\nBay")
+
+tpp_reg_c_s <- tpp_reg_c %>% 
+  filter(div %in% unique(tpp_filt_20$div) & div %in% unique(tpp_filt_17$div))
+
+tpp_reg_s <- tpp_reg_c_s %>% 
+  group_by(party, party_lab, year, reg) %>% 
+  summarise(v = sum(v, na.rm = T)) %>% 
+  group_by(year, reg) %>% 
+  mutate(p = v / sum(v, na.rm =  T)* 100) %>% 
+  ungroup() %>% 
+  mutate(year = as.numeric(year)) %>% 
+  ungroup() %>% 
+  arrange(party_lab, reg) %>% 
+  mutate(s = p - lag(p, 1)) 
+
+tpp_reg_s[tpp_reg_s$year == "2017",]$s = NA
+
+tpp_reg_s$reg_lab <- recode(tpp_reg_s$reg, cap = "Capricornia", cq = "CQ", fnq = "FNQ", gc = "Gold\nCoast", mn = "Metro\nNorth", ms = "Metro\nSouth", mw = "Metro\nWest", nq = "North", wm= "West\nMoreton", sw = "South\nWest", sc = "Sun.\nCoast", wb = "Wide\nBay")
+
+
+# CHARTS ----- 
+
+# Primary votes across state
+
+p_p_state <- p_state_oth %>% 
+  filter(year == 2020) %>% 
+  ggplot(aes(x = reorder(party_lab, -p), y = p, fill = party_lab))  + 
+    geom_bar(stat="identity") + 
+    theme_mc +
+    labs(title = paste("Primary votes at 2020 QLD election"), caption = "", x = "", y = "") +
+    theme(panel.grid.major = element_blank()) +
+    geom_text(aes(label = paste(round(p,1))), vjust = -1, size=3) +
+    scale_fill_manual(values = c(LNP = "blue", Labor = "red", Greens = "green", Other = "grey", "One\nNation" = "orange", KAP = "maroon")) +
+    ylim(0, 60)
+
+p_p_state_s <- p_state_oth %>% 
+  filter(year == 2020) %>% 
+  ggplot(aes(x = reorder(party_lab, -p), y = s, fill = party_lab))  + 
+  geom_bar(stat="identity") + 
+  theme_mc +
+  labs(title = paste("Swing in primary votes at 2020 QLD election"), caption = "", x = "", y = "") +
+  theme(panel.grid.major = element_blank()) +
+  geom_text(aes(label = paste(round(s, 1)), vjust = ifelse(s >= 0, -1, 1.5)), size=3) +
+  scale_fill_manual(values = c(LNP = "blue", Labor = "red", Greens = "green", Other = "grey", "One\nNation" = "orange", KAP = "maroon")) +
+  ylim(-10, 10)
+
+# primary vote by division
+
+f_p_div <- function(di) {
+  
+  p_oth %>% 
+    ungroup() %>% 
+    filter(year == 2020 & div == di) %>% 
+    ggplot(aes(x = reorder(party_lab, -p), y = p, fill = party_lab))  + 
+    geom_bar(stat = "identity") +
+    theme_mc +
+    labs(title = paste("Primary vote in", di), subtitle = "", x = "", y = "") +
+    theme(panel.grid.major = element_blank()) +
+    geom_text(aes(label = paste(round(p,1))), vjust = -1, size=2) +
+    scale_fill_manual(values = c(LNP = "blue", Labor = "red", "One\nNation" = "orange", KAP = "maroon", Greens = "green", Other = "yellow")) +
+    ylim(0, 70) +
+    theme(axis.text = element_text(size = 8, vjust = 0.3, hjust = 0.5))
+  
+}
+
+p_p_div <- map(unique(p_oth$div), f_p_div) 
+
+names(p_p_div) <- unique(p_oth$div)
+
+f_p_div_s <- function(di) {
+  
+  p_oth %>% 
+    ungroup() %>% 
+    filter(year == 2020 & div == di & party_lab != "Other") %>% 
+    ggplot(aes(x = reorder(party_lab, -s), y = s, fill = party_lab))  + 
+    geom_bar(stat = "identity") +
+    theme_mc +
+    labs(title = paste("Primary swing in", di), subtitle = "", x = "", y = "") +
+    theme(panel.grid.major = element_blank()) +
+    geom_text(aes(label = paste(round(s, 1)), vjust = ifelse(s >= 0, -1, 1.5)), size=2) +
+    scale_fill_manual(values = c(LNP = "blue", Labor = "red", "One\nNation" = "orange", KAP = "maroon", Greens = "green", Other = "yellow")) +
+    ylim(-20, 20) +
+    theme(axis.text = element_text(size = 8, vjust = 0.3, hjust = 0.5))
+  
+}
+
+p_p_div_s <- map(unique(p_oth$div), f_p_div_s) 
+
+names(p_p_div_s) <- unique(p_oth$div)
+
+# lnp primary across seats
+
+p_lnp <- p_lnp %>% 
+  arrange(-p)
+
+p_p_div_1 <- p_lnp[1:31,] %>% 
+  ggplot(aes(x = reorder(div, -p), y = p, fill = state_mp))  + 
+  geom_bar(stat = "identity", position = position_dodge(width=.6), width = 0.7 ) +
+  theme_mc +
+  labs(title = paste("LNP primary in state divisions"), subtitle = "", x = "", y = "") +
+  theme(panel.grid.major = element_blank()) +
+  geom_text(aes(label = paste(round(p, 1))), vjust = -1, size= 2) +
+  theme(axis.text.x = element_text(size = 8, angle = 90, vjust = 0.3, hjust = 1)) +
+  scale_fill_manual(values = c(lnp = "blue", alp = "red", on = "orange", kap = "maroon", ind = "yellow", grn = "green")) +
+  ylim(0, 75)
+  
+p_p_div_2 <- p_lnp[32:62,] %>% 
+  ggplot(aes(x = reorder(div, -p), y = p, fill = state_mp))  + 
+  geom_bar(stat = "identity", position = position_dodge(width=.6), width = 0.7 ) +
+  theme_mc +
+  labs(title = paste("LNP primary in state divisions"), subtitle = "", x = "", y = "") +
+  theme(panel.grid.major = element_blank()) +
+  geom_text(aes(label = paste(round(p, 1))), vjust = -1, size= 2) +
+  theme(axis.text.x = element_text(size = 8, angle = 90, vjust = 0.3, hjust = 1)) +
+  scale_fill_manual(values = c(lnp = "blue", alp = "red", on = "orange", kap = "maroon", ind = "yellow", grn = "green")) +
+  ylim(0, 75)
+
+p_p_div_3 <- p_lnp[63:93,] %>% 
+  ggplot(aes(x = reorder(div, -p), y = p, fill = state_mp))  + 
+  geom_bar(stat = "identity", position = position_dodge(width=.6), width = 0.7 ) +
+  theme_mc +
+  labs(title = paste("LNP primary in state divisions"), subtitle = "", x = "", y = "") +
+  theme(panel.grid.major = element_blank()) +
+  geom_text(aes(label = paste(round(p, 1))), vjust = -1, size= 2) +
+  theme(axis.text.x = element_text(size = 8, angle = 90, vjust = 0.3, hjust = 1)) +
+  scale_fill_manual(values = c(lnp = "blue", alp = "red", on = "orange", kap = "maroon", ind = "yellow", grn = "green")) +
+  ylim(0, 75)
+
+# lnp primary swing across seats
+
+p_lnp <- p_lnp %>% 
+  arrange(-s)
+
+p_p_div_s_1 <- p_lnp[1:31,] %>% 
+  ggplot(aes(x = reorder(div, -s), y = s, fill = state_mp))  + 
+  geom_bar(stat = "identity", position = position_dodge(width=.6), width = 0.7 ) +
+  theme_mc +
+  labs(title = paste("LNP primary swing"), subtitle = "", x = "", y = "") +
+  theme(panel.grid.major = element_blank()) +
+  geom_text(aes(label = paste(round(s, 1)), vjust = ifelse(s >= 0, -1, 1.5)), size= 2) +
+  theme(axis.text.x = element_text(size = 8, angle = 90, vjust = 0.3, hjust = 1)) +
+  scale_fill_manual(values = c(lnp = "blue", alp = "red", on = "orange", kap = "maroon", ind = "yellow", grn = "green")) +
+  ylim(-20, 30)
+
+p_p_div_s_2 <- p_lnp[32:62,] %>% 
+  ggplot(aes(x = reorder(div, -s), y = s, fill = state_mp))  + 
+  geom_bar(stat = "identity", position = position_dodge(width=.6), width = 0.7 ) +
+  theme_mc +
+  labs(title = paste("LNP primary swing"), subtitle = "", x = "", y = "") +
+  theme(panel.grid.major = element_blank()) +
+  geom_text(aes(label = paste(round(s, 1)), vjust = ifelse(s >= 0, -1, 1.5)), size= 2) +
+  theme(axis.text.x = element_text(size = 8, angle = 90, vjust = 0.3, hjust = 1)) +
+  scale_fill_manual(values = c(lnp = "blue", alp = "red", on = "orange", kap = "maroon", ind = "yellow", grn = "green")) +
+  ylim(-20, 30)
+
+p_p_div_s_3 <- p_lnp[63:93,] %>% 
+  ggplot(aes(x = reorder(div, -s), y = s, fill = state_mp))  + 
+  geom_bar(stat = "identity", position = position_dodge(width=.6), width = 0.7 ) +
+  theme_mc +
+  labs(title = paste("LNP primary swing"), subtitle = "", x = "", y = "") +
+  theme(panel.grid.major = element_blank()) +
+  geom_text(aes(label = paste(round(s, 1)), vjust = ifelse(s >= 0, -1, 1.5)), size= 2) +
+  theme(axis.text.x = element_text(size = 8, angle = 90, vjust = 0.3, hjust = 1)) +
+  scale_fill_manual(values = c(lnp = "blue", alp = "red", on = "orange", kap = "maroon", ind = "yellow", grn = "green")) +
+  ylim(-20, 30)
+
+# lnp primary across regions
+
+p_p_reg <- p_reg %>% 
+  filter(party_lab == "LNP" & year == 2020) %>% 
+  ggplot(aes(x = reorder(reg_lab, -p), y = p))  + 
+  geom_bar(stat = "identity", fill = line_color, position = position_dodge(width=.6), width = 0.7 ) +
+  theme_mc +
+  labs(title = paste("LNP primary across regions"), subtitle = "", x = "", y = "") +
+  theme(panel.grid.major = element_blank()) +
+  geom_text(aes(label = paste(round(p, 1))), vjust = -1, size= 3) +
+  theme(axis.text.x = element_text(size = 8, angle = 90, vjust = 0.3, hjust = 1)) +
+  ylim(0, 75)
+
+p_p_reg_s <- p_reg %>% 
+  filter(party_lab == "LNP" & year == 2020) %>% 
+  ggplot(aes(x = reorder(reg_lab, -s), y = s))  + 
+  geom_bar(stat = "identity", fill = line_color, position = position_dodge(width=.6), width = 0.7 ) +
+  theme_mc +
+  labs(title = paste("LNP primary swing across regions"), subtitle = "", x = "", y = "") +
+  theme(panel.grid.major = element_blank()) +
+  geom_text(aes(label = paste(round(s, 1)), vjust = ifelse(s >= 0, -1, 1.5)), size= 3) +
+  theme(axis.text.x = element_text(size = 8, angle = 90, vjust = 0.3, hjust = 1)) +
+  ylim(0-10, 15)
+
+# lnp tpp across regions
+
+p_tpp_reg <- tpp_reg %>% 
+  filter(party_lab == "LNP" & year == 2020) %>% 
+  ggplot(aes(x = reorder(reg_lab, -p), y = p))  + 
+  geom_bar(stat = "identity", fill = line_color, position = position_dodge(width=.6), width = 0.7 ) +
+  theme_mc +
+  labs(title = paste("LNP TPP across regions"), subtitle = "", x = "", y = "") +
+  theme(panel.grid.major = element_blank()) +
+  geom_text(aes(label = paste(round(p, 1))), vjust = -1, size= 3) +
+  theme(axis.text.x = element_text(size = 8, angle = 90, vjust = 0.3, hjust = 1)) +
+  ylim(0, 100)
+
+p_tpp_reg_s <- tpp_reg_s %>% 
+  filter(party_lab == "LNP" & year == 2020) %>% 
+  ggplot(aes(x = reorder(reg_lab, -s), y = s))  + 
+  geom_bar(stat = "identity", fill = line_color, position = position_dodge(width=.6), width = 0.7 ) +
+  theme_mc +
+  labs(title = paste("LNP TPP swing across regions"), subtitle = "", x = "", y = "") +
+  theme(panel.grid.major = element_blank()) +
+  geom_text(aes(label = paste(round(s, 1)), vjust = ifelse(s >= 0, -1, 1.5)), size= 3) +
+  theme(axis.text.x = element_text(size = 8, angle = 90, vjust = 0.3, hjust = 1)) +
+  ylim(-10, 10)
+
+
+
+# lnp tpp across seats
+
+tpp_lnp <- tpp_lnp %>% 
+  arrange(-p)
+
+p_tpp_div_1 <- tpp_lnp[1:25,] %>% 
+  ggplot(aes(x = reorder(div, -p), y = p, fill = state_mp))  + 
+  geom_bar(stat = "identity", position = position_dodge(width=.6), width = 0.7 ) +
+  theme_mc +
+  labs(title = paste("LNP TPP in state divisions"), subtitle = "", x = "", y = "") +
+  theme(panel.grid.major = element_blank()) +
+  geom_text(aes(label = paste(round(p, 1))), vjust = -1, size= 2) +
+  theme(axis.text.x = element_text(size = 8, angle = 90, vjust = 0.3, hjust = 1)) +
+  scale_fill_manual(values = c(lnp = "blue", alp = "red", on = "orange", kap = "maroon", ind = "yellow", grn = "green")) +
+  ylim(0, 75)
+
+p_tpp_div_2 <- tpp_lnp[26:50,] %>% 
+  ggplot(aes(x = reorder(div, -p), y = p, fill = state_mp))  + 
+  geom_bar(stat = "identity", position = position_dodge(width=.6), width = 0.7 ) +
+  theme_mc +
+  labs(title = paste("LNP TPP in state divisions"), subtitle = "", x = "", y = "") +
+  theme(panel.grid.major = element_blank()) +
+  geom_text(aes(label = paste(round(p, 1))), vjust = -1, size= 2) +
+  theme(axis.text.x = element_text(size = 8, angle = 90, vjust = 0.3, hjust = 1)) +
+  scale_fill_manual(values = c(lnp = "blue", alp = "red", on = "orange", kap = "maroon", ind = "yellow", grn = "green")) +
+  ylim(0, 75)
+
+p_tpp_div_3 <- tpp_lnp[51:75,] %>% 
+  ggplot(aes(x = reorder(div, -p), y = p, fill = state_mp))  + 
+  geom_bar(stat = "identity", position = position_dodge(width=.6), width = 0.7 ) +
+  theme_mc +
+  labs(title = paste("LNP TPP in state divisions"), subtitle = "", x = "", y = "") +
+  theme(panel.grid.major = element_blank()) +
+  geom_text(aes(label = paste(round(p, 1))), vjust = -1, size= 2) +
+  theme(axis.text.x = element_text(size = 8, angle = 90, vjust = 0.3, hjust = 1)) +
+  scale_fill_manual(values = c(lnp = "blue", alp = "red", on = "orange", kap = "maroon", ind = "yellow", grn = "green")) +
+  ylim(0, 75)
+
+# lnp tpp swing across seats
+
+tpp_lnp_s <- tpp_lnp %>% 
+  arrange(-s) %>% 
+  filter(!is.na(s))
+
+p_tpp_div_s_1 <- tpp_lnp_s[1:23,] %>% 
+  ggplot(aes(x = reorder(div, -s), y = s, fill = state_mp))  + 
+  geom_bar(stat = "identity", position = position_dodge(width=.6), width = 0.7 ) +
+  theme_mc +
+  labs(title = paste("LNP TPP swing"), subtitle = "", x = "", y = "") +
+  theme(panel.grid.major = element_blank()) +
+  geom_text(aes(label = paste(round(s, 1)), vjust = ifelse(s >= 0, -1, 1.5)), size= 2) +
+  theme(axis.text.x = element_text(size = 8, angle = 90, vjust = 0.3, hjust = 1)) +
+  scale_fill_manual(values = c(lnp = "blue", alp = "red", on = "orange", kap = "maroon", ind = "yellow", grn = "green")) +
+  ylim(-20, 20)
+
+p_tpp_div_s_2 <- tpp_lnp_s[24:46,] %>% 
+  ggplot(aes(x = reorder(div, -s), y = s, fill = state_mp))  + 
+  geom_bar(stat = "identity", position = position_dodge(width=.6), width = 0.7 ) +
+  theme_mc +
+  labs(title = paste("LNP TPP swing"), subtitle = "", x = "", y = "") +
+  theme(panel.grid.major = element_blank()) +
+  geom_text(aes(label = paste(round(s, 1)), vjust = ifelse(s >= 0, -1, 1.5)), size= 2) +
+  theme(axis.text.x = element_text(size = 8, angle = 90, vjust = 0.3, hjust = 1)) +
+  scale_fill_manual(values = c(lnp = "blue", alp = "red", on = "orange", kap = "maroon", ind = "yellow", grn = "green")) +
+  ylim(-20, 20)
+
+p_tpp_div_s_3 <- tpp_lnp_s[47:70,] %>% 
+  ggplot(aes(x = reorder(div, -s), y = s, fill = state_mp))  + 
+  geom_bar(stat = "identity", position = position_dodge(width=.6), width = 0.7 ) +
+  theme_mc +
+  labs(title = paste("LNP TPP swing"), subtitle = "", x = "", y = "") +
+  theme(panel.grid.major = element_blank()) +
+  geom_text(aes(label = paste(round(s, 1)), vjust = ifelse(s >= 0, -1, 1.5)), size= 2) +
+  theme(axis.text.x = element_text(size = 8, angle = 90, vjust = 0.3, hjust = 1)) +
+  scale_fill_manual(values = c(lnp = "blue", alp = "red", on = "orange", kap = "maroon", ind = "yellow", grn = "green")) +
+  ylim(-20, 20)
+
+# primary votes in federal seats
+
+f_p_fed <- function(di) {
+  
+  pb20_f %>% 
+    ungroup() %>% 
+    filter(fed_div == di) %>% 
+    ggplot(aes(x = reorder(party_lab, -p), y = p, fill = party_lab))  + 
+    geom_bar(stat = "identity") +
+    theme_mc +
+    labs(title = paste("Primary vote in", di), subtitle = "", x = "", y = "") +
+    theme(panel.grid.major = element_blank()) +
+    geom_text(aes(label = paste(round(p,1))), vjust = -1, size=2) +
+    scale_fill_manual(values = c(LNP = "blue", Labor = "red", "One\nNation" = "orange", KAP = "maroon", Greens = "green", Other = "yellow")) +
+    ylim(0, 70) +
+    theme(axis.text = element_text(size = 8, vjust = 0.3, hjust = 0.5))
+  
+}
+
+p_p_fed <- map(unique(pb20_f$fed_div), f_p_fed) 
+
+names(p_p_fed) <- unique(pb20_f$fed_div)
+
+
+# EXPORT ----
+
+png("images/p_nats1.png", width = 6, height = 4, units = "in", res = 300)
+grid.arrange(p_p_fed$Dawson, p_p_fed$Capricornia, p_p_fed$Flynn, p_p_fed$Hinkler)
+dev.off() 
+
+png("images/p_nats2.png", width = 6, height = 4, units = "in", res = 300)
+grid.arrange(p_p_fed$`Wide Bay`, p_p_fed$Maranoa, p_p_fed$Kennedy, p_p_fed$Herbert)
+dev.off() 
+
+
