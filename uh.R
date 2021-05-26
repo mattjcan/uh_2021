@@ -195,7 +195,7 @@ m_nat <- leaflet(data = uh %>% filter(party == "Nats")) %>%
   addPolygons(data = h_map, color = "blue", weight = 1, opacity = 1, fill = FALSE, label = h_map$Elect_div, highlight = highlightOptions(weight = 2, color = "blue", bringToFront = TRUE)) %>% 
   addLegend(title = "Nats primary (%)", pal = pal_nat, values = c(0, 60), position = "bottomright") 
 
-saveWidget(m_nat, file="m_nat_uh.html")
+# saveWidget(m_nat, file="m_nat_uh.html")
 
 pal_nat_s <- colorBin(c( "#ff1414", "#ff4e4e", "#ff8989", "#d6f5d6", "#29a329", "#1f7a1f"), domain = uh$s, bins = c(-30, -20, -10, 0, 10, 20, 30))
 
@@ -204,6 +204,9 @@ m_nat_s <- leaflet(data = uh %>% filter(party == "Nats")) %>%
   addCircleMarkers(data = uh %>% filter(party == "Nats"), fillOpacity = 1, color = ~pal_nat_s(s), radius = 5, stroke = FALSE, popup = ~popup_label) %>% 
   addPolygons(data = h_map, color = "blue", weight = 1, opacity = 1, fill = FALSE, label = h_map$Elect_div, highlight = highlightOptions(weight = 2, color = "blue", bringToFront = TRUE)) %>% 
   addLegend(title = "Nats primary vote swing(%)", pal = pal_nat_s, values = c(0, 60), position = "bottomright") 
+
+# saveWidget(m_nat_s, file="m_nat_s_uh.html")
+
 
 # PLOTS ----
 
@@ -343,10 +346,11 @@ p_hunter_v <- uh_fed_v %>%
 
 # EXPORT ---- 
 
-png("img/p_pb_21_s.png", width = 6, height = 4, units = "in", res = 300)
-p_pb_21_s
-dev.off() 
-
 png("img/p_hunter_s.png", width = 6, height = 4, units = "in", res = 300)
 p_hunter_s
+dev.off() 
+
+
+png("img/p_pb_21_s.png", width = 6, height = 4, units = "in", res = 300)
+p_pb_21_s
 dev.off() 
