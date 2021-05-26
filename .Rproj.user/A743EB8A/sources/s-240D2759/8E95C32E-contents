@@ -19,7 +19,7 @@ source("uh.R")
 
 # Primary votes
 
-- The Nats and Labor won just 53 per cent of the vote in Upper Hunter. Almost half the electorate voted for minor party or indepndent candidates.
+- The Nats and Labor won just 53 per cent of the vote in Upper Hunter. Almost half the electorate voted for minor party or independent candidates.
 
 ``` {r fig.height = 4.5}
 grid.arrange(p_party_21, p_party_s, ncol = 1)
@@ -55,7 +55,7 @@ p_pb_21_s
 
 - Contrary to popular opinion, the Nationals vote dropped more in the Federal seat of Hunter than Labor. 
 
-``` {r fig.height = 4.5}
+``` {r fig.height = 4}
 p_hunter_s
 ```
 
@@ -63,9 +63,9 @@ p_hunter_s
 
 # One Nation in box seat for Federal seat
 
-- If the votes were repeated across Hunter - and One Nation and Shooters exchanged preferences - the Nats would risk falling to third place putting One Nation in box seat.
+- If the votes were repeated across Hunter - and One Nation and Shooters exchanged preferences - the Nats would risk falling to third place, putting One Nation in the box seat.
 
-``` {r fig.height = 4.5}
+``` {r fig.height = 4}
 p_hunter
 ```
 
