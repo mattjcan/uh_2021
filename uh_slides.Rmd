@@ -29,7 +29,7 @@ grid.arrange(p_party_21, p_party_s, ncol = 1)
 
 # Just 1/3 of voters were in the Federal seat of Hunter
 
-- Two-thirds of the voters in the state seat of Upper Hunter reside in federal electorates held by the Natioanls. 
+- Two-thirds of the voters in the state seat of Upper Hunter reside in federal electorates held by the Nationals. 
 
 - There are more voters from the New England than Hunter in the state seat of Upper Hunter.
 
@@ -41,9 +41,9 @@ p_hunter_v
 
 # The Nats had the biggest swings away in Hunter
 
-- Every booth swing away from the Nats in Hunter except for one - Singleton Heights. In general, coal mining booths swung away from the Nationals, in contrast to the 2019 Federal election.
+- Every booth swung away from the Nats in Hunter except for one - Singleton Heights. In general, coal mining booths swung away from the Nationals, in contrast to the 2019 Federal election.
 
-- Dave Gayzell's local popularity in Lyne, not the coal vote, helped us win the seat.
+- Dave Layzell's local popularity in Lyne, not the coal vote, helped us win the seat.
 
 ``` {r fig.height = 3.5}
 p_pb_21_s
@@ -70,7 +70,6 @@ p_hunter
 ```
 
 ---
-
 
 # Swing against Labor
 

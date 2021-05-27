@@ -82,6 +82,8 @@ uh <- bind_rows(uh21, uh19)
 uh <- uh %>% 
   filter(party != "Informal")
 
+uh_t <- uh
+
 uh <- uh %>% 
   select(-pb) %>% 
   group_by(lab, year) %>% 
@@ -121,19 +123,32 @@ uh_gg <- uh_gg %>%
 
 uh <- left_join(uh, uh_gg, by = "lab")
 
-uh_party <- uh %>% 
+uh_t <- uh_t %>% 
   ungroup() %>% 
-  group_by(party) %>% 
-  summarise(v21 = sum(v21, na.rm = T),
-            v19 = sum(v19, na.rm = T)) %>% 
-  mutate(p21 = v21 / sum(v21, na.rm = T) * 100,
-         p19 = v19 / sum(v19, na.rm = T) * 100) %>% 
+  group_by(party, year) %>% 
+  summarise(v = sum(v, na.rm = T)) %>%
+  group_by(year) %>% 
+  mutate(p = v / sum(v, na.rm = T) * 100)
+
+uh_t21 <- uh_t %>% 
   ungroup() %>% 
-  group_by(party) %>% 
-  arrange(party) %>% 
-  mutate(s = p21 - p19) %>% 
+  filter(year == "2021") %>% 
+  rename(p21 = p,
+         v21 = v) %>% 
+  select(-year)
+
+uh_t19 <- uh_t %>%
   ungroup() %>% 
-  arrange(party)
+  filter(year == "2019") %>% 
+  select(-year) %>% 
+  rename(p19 = p,
+         v19 = v)
+
+uh_t <- left_join(uh_t21, uh_t19, by = c("party"))
+
+uh_t$s <- ifelse(is.na(uh_t$p19), uh_t$p21, uh_t$p21 - uh_t$p19)
+
+uh_party <- uh_t
 
 # MAPS ----
 
